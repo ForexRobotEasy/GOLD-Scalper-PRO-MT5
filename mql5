@@ -1,0 +1,103 @@
+
+// GOLD Scalper PRO MT5
+// Developer's site: forexroboteasy.com
+// Development: Forex Robot Easy Team
+
+// Define necessary input parameters
+input double LotSize = 0.01; // Lot size for each trade
+input double StopLoss = 50; // Stop loss level in pips
+input double TakeProfit = 100; // Take profit level in pips
+
+// Define necessary variables
+int ticket; // Order ticket number
+bool buySignal; // Flag for buy signal
+bool sellSignal; // Flag for sell signal
+
+// Define entry logic
+void EntryLogic()
+{
+    // Get the current market impulse and correction
+    double impulse = iMACD(NULL, 0, 12, 26, 9, PRICE_CLOSE, MODE_MAIN, 0);
+    double correction = iMA(NULL, 0, 100, 0, MODE_SMA, PRICE_CLOSE, 0);
+
+    // Check if the market impulse is positive and correction is negative
+    if (impulse > 0 && correction < 0)
+    {
+        buySignal = true;
+    }
+    // Check if the market impulse is negative and correction is positive
+    else if (impulse < 0 && correction > 0)
+    {
+        sellSignal = true;
+    }
+}
+
+// Define exit logic
+void ExitLogic()
+{
+    // Check if there is an open buy position
+    if (buySignal && OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES))
+    {
+        // Check if the current price is below the stop loss level
+        if (Bid <= OrderOpenPrice() - StopLoss * Point)
+        {
+            // Close the buy position with stop loss
+            OrderClose(ticket, OrderLots(), Bid, 3, clrRed);
+        }
+        // Check if the current price is above the take profit level
+        else if (Bid >= OrderOpenPrice() + TakeProfit * Point)
+        {
+            // Close the buy position with take profit
+            OrderClose(ticket, OrderLots(), Bid, 3, clrGreen);
+        }
+    }
+
+    // Check if there is an open sell position
+    if (sellSignal && OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES))
+    {
+        // Check if the current price is above the stop loss level
+        if (Ask >= OrderOpenPrice() + StopLoss * Point)
+        {
+            // Close the sell position with stop loss
+            OrderClose(ticket, OrderLots(), Ask, 3, clrRed);
+        }
+        // Check if the current price is below the take profit level
+        else if (Ask <= OrderOpenPrice() - TakeProfit * Point)
+        {
+            // Close the sell position with take profit
+            OrderClose(ticket, OrderLots(), Ask, 3, clrGreen);
+        }
+    }
+}
+
+// Start of the trading algorithm
+void OnTick()
+{
+    // Check if there are no open positions
+    if (!OrdersTotal())
+    {
+        // Generate entry logic
+        EntryLogic();
+
+        // Check if there is a buy signal
+        if (buySignal)
+        {
+            // Open a buy position
+            ticket = OrderSend(Symbol(), OP_BUY, LotSize, Ask, 3, Bid - StopLoss * Point, Bid + TakeProfit * Point, 'Buy', 0, 0, clrGreen);
+            buySignal = false; // Reset the buy signal flag
+        }
+
+        // Check if there is a sell signal
+        if (sellSignal)
+        {
+            // Open a sell position
+            ticket = OrderSend(Symbol(), OP_SELL, LotSize, Bid, 3, Ask + StopLoss * Point, Ask - TakeProfit * Point, 'Sell', 0, 0, clrRed);
+            sellSignal = false; // Reset the sell signal flag
+        }
+    }
+    // If there are open positions, generate exit logic
+    else
+    {
+        ExitLogic();
+    }
+}
